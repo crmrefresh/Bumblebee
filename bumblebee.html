@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bumblebee | CRM Refresh Monthly Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ---------- report (also what prints) ---------- */
+
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,Arial,sans-serif;color:#14181F;font-size:10.5pt;line-height:1.45;
+     -webkit-print-color-adjust:exact;print-color-adjust:exact}
+a{color:#1C53E5;font-weight:600}
+.head{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:14px;border-bottom:3px solid #1C53E5}
+.eyebrow{color:#1C53E5;font-weight:700;font-size:10pt;letter-spacing:3px}
+.title{font-weight:800;font-size:22pt;letter-spacing:-.4px;margin-top:2px}
+.title span{color:#1C53E5}
+.prep{text-align:right;color:#5B6470;font-size:10.5pt;line-height:1.55}
+.prep b{display:block;color:#14181F;font-size:13pt;font-weight:700}
+.label{display:flex;align-items:center;gap:12px;margin:22px 0 10px;font-weight:700;font-size:10pt;letter-spacing:1.8px;color:#1C53E5;
+       break-after:avoid}
+.label:after{content:"";flex:1;height:1px;background:#E4E7EC}
+.label.orange{color:#E8650F}
+.label.green{color:#2E7D32}
+/* hero */
+.hero{display:grid;grid-template-columns:2.1in 1fr;gap:14px;margin-top:18px;break-inside:avoid}
+.score{background:#1C53E5;color:#fff;border-radius:14px;padding:16px 18px;position:relative;overflow:hidden}
+.score:after{content:"";position:absolute;right:-40px;bottom:-50px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.12)}
+.score .k{font-size:9pt;font-weight:700;letter-spacing:2px;opacity:.85}
+.score .v{font-size:42pt;font-weight:800;line-height:1;margin-top:8px;letter-spacing:-1px}
+.score .s{font-size:9.5pt;margin-top:8px;opacity:.9}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{border:1px solid #E4E7EC;border-top:4px solid #1C53E5;border-radius:10px;padding:10px 12px}
+.tile b{display:block;font-size:20pt;font-weight:800;line-height:1.1}
+.tile span{font-size:9pt;color:#5B6470;line-height:1.3;display:block;margin-top:3px}
+/* needs */
+.needs{background:#FFF6EC;border:1px solid #F8DDBF;border-radius:12px;padding:4px 18px 14px;break-inside:avoid}
+.ask{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid #F5E2CC}
+.ask .num{flex:none;width:22px;height:22px;border-radius:50%;background:#F06A1D;color:#fff;font-weight:700;font-size:9.5pt;
+          display:flex;align-items:center;justify-content:center;margin-top:1px}
+.ask div{font-size:10.5pt;line-height:1.45}
+.needs-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:12px;font-size:9.5pt;color:#5B6470}
+a.btn{flex:none;background:#1C53E5;color:#fff;text-decoration:none;font-weight:700;font-size:10pt;padding:9px 16px;border-radius:8px}
+.cta{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:22px;background:#14181F;color:#fff;
+     border-radius:12px;padding:16px 20px;break-inside:avoid}
+.cta b{display:block;font-size:12pt;margin-bottom:2px}
+.cta span{font-size:9.5pt;color:#C9D1E4}
+/* bars panel (Send It style) */
+.panel{background:#EEF2FD;border:1px solid #D9E2FA;border-radius:12px;padding:8px 18px;break-inside:avoid}
+.bar{display:grid;grid-template-columns:1.6in 1fr 1.25in;align-items:center;gap:14px;padding:8px 0}
+.bar .n{font-weight:700;font-size:10.5pt}
+.bar .t{height:12px;border-radius:99px;background:#D9E2F7;overflow:hidden}
+.bar .t i{display:block;height:100%;border-radius:99px;background:#1C53E5}
+.bar .t i.o{background:#F06A1D}
+.bar .t i.g{background:#9AA3B2}
+.bar .v{text-align:right;font-size:9.5pt;color:#5B6470;white-space:nowrap}
+.bar .v b{font-size:12pt;color:#14181F;font-weight:800;margin-right:3px}
+.chip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;font-size:8.5pt;font-weight:700}
+.chip.up{background:#E3EAFD;color:#1C53E5}.chip.dn{background:#FDE9DC;color:#C2530F}.chip.eq{background:#EEF0F3;color:#8A8F9C}
+.panel .foot{border-top:1px solid #D9E2F7;padding:8px 0 4px;font-size:9pt;color:#5B6470}
+.panel .tot{display:flex;justify-content:space-between;border-top:1px solid #D9E2F7;padding:9px 0 4px;font-weight:700}
+/* two columns */
+.panel.deliv{display:grid;grid-template-columns:.95fr 1.45fr;gap:20px;align-items:center;padding:14px 18px}
+.deliv h4{font-size:13pt;font-weight:700;line-height:1.3;letter-spacing:-.2px;margin-bottom:6px}
+.deliv p{font-size:9.5pt;line-height:1.5;color:#5B6470}
+.deliv .why{margin:8px 0 0;color:#1C53E5}
+.why.after{margin:8px 0 0}
+.bottom-why{border-top:1px solid rgba(20,24,31,.07);padding-top:7px;margin-top:2px}
+.bottom-why .why{margin:0}
+.why b{font-weight:700;color:inherit}
+.why,.why b{font-style:normal}
+.deliv .dr{display:grid;gap:10px}
+.gt.et b{color:#1C53E5}
+.gt.et em{display:block;font-style:normal;font-size:8.5pt;line-height:1.35;color:#5B6470;margin-top:4px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.cols>div{min-width:0}
+.cols.eq{grid-auto-rows:1fr;align-items:stretch;row-gap:12px}
+.cols.eq>.box{margin-bottom:0;display:flex;flex-direction:column}
+.box{border:1px solid #E4E7EC;border-radius:12px;padding:6px 16px 10px;margin-bottom:12px;break-inside:avoid;background:#fff}
+.box.green{background:#EEF6EE;border-color:#D4E8D4}
+.box h4{font-size:11pt;font-weight:700;padding:8px 0 4px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(20,24,31,.07);font-size:10pt}
+.row b{font-weight:800;font-size:11pt}
+.green .row b{color:#2E7D32}
+.note{font-size:9pt;color:#5B6470;padding-top:7px;border-top:1px solid rgba(20,24,31,.07)}
+.note strong{color:#14181F}
+.panel .bar.compact{grid-template-columns:1.55in 1fr .85in;gap:12px}
+.panel .bar.compact .n{line-height:1.25}
+.panel.wide .bar{grid-template-columns:1.3in 1fr .8in;gap:12px}
+.gtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 0}
+.gt{background:#fff;border:1px solid #D9E2FA;border-radius:10px;padding:10px 14px}
+.gt .gn{display:block;font-size:9.5pt;font-weight:400;color:#5B6470;line-height:1.3}
+.gt b{display:block;font-size:22pt;font-weight:800;line-height:1.15;letter-spacing:-.5px}
+.gt .gc{display:flex;align-items:center;gap:6px;font-size:8.5pt;color:#8A8F9C}
+.gt .gc .chip{margin-left:0}
+.gt em{font-style:normal}
+.keep{break-inside:avoid}
+.npswrap{margin-top:8px}
+.nps{background:#fff;border:2px solid #1C53E5;border-radius:12px;padding:14px 18px 12px}
+.nps b{display:block;font-size:11pt;margin-bottom:10px}
+.nbs{display:grid;grid-template-columns:repeat(11,1fr);gap:6px}
+.nb{display:block;text-align:center;background:#EEF2FD;border:1px solid #D9E2FA;border-radius:7px;padding:9px 0;font-weight:700;font-size:10.5pt;color:#1C53E5;text-decoration:none}
+.nps span{display:block;margin-top:8px;font-size:9pt;color:#5B6470}
+.cols{break-inside:avoid}
+
+.caught{display:flex;align-items:center;gap:12px;padding:14px 18px}
+.caught b{font-size:12pt;color:#2E7D32}
+.caught span{font-size:10pt;color:#5B6470}
+.why{font-family:'DM Sans',Inter,sans-serif;font-style:normal;font-weight:400;font-size:10.5pt;letter-spacing:0;font-variation-settings:'opsz' 14;color:#3A404C;line-height:1.3;margin:-4px 0 9px;text-wrap:pretty}
+.whys{margin-top:8px}.whys .why{margin:0 0 3px}
+.box .why{margin:0 0 6px;font-size:10pt;color:#1C53E5}
+.gt.c{text-align:center}
+.gt.c .gc{justify-content:center}
+
+.hs{display:grid;grid-template-columns:2.15in 1fr;gap:12px;align-items:stretch}
+.hs .sc{background:#fff;border:1px solid #D9E2FA;border-radius:10px;padding:14px 16px;text-align:center}
+.hs .sc .k{font-size:9pt;font-weight:700;letter-spacing:2px;color:#5B6470}
+.hs .sc .v{font-size:40pt;font-weight:800;line-height:1;letter-spacing:-1.5px;margin-top:8px}
+.hs .sc .v small{font-size:16pt;color:#8A8F9C;font-weight:700;letter-spacing:0}
+.hs .sc .chip{margin:10px 0 0}
+.hs .bars{background:#fff;border:1px solid #D9E2FA;border-radius:10px;padding:10px 18px;display:flex;flex-direction:column;justify-content:center}
+.hs .bars .bar{grid-template-columns:1.3in 1fr .45in}
+.hs .bars .bar .n span{display:block;font-size:8.5pt;font-weight:400;color:#8A8F9C}
+.hh{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.hbox{border-radius:12px;padding:4px 16px 8px;break-inside:avoid}
+.hbox.help{background:#EEF6EE;border:1px solid #D4E8D4}
+.hbox.hurt{background:#FFF6EC;border:1px solid #F8DDBF}
+.hrow{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(20,24,31,.07)}
+.hrow:last-child{border-bottom:0}
+.hrow b{font-size:10.5pt;font-weight:700}
+.hrow span{display:block;font-size:9pt;color:#5B6470;margin-top:1px}
+.hrow .p{font-weight:800;font-size:11.5pt}
+.help .p{color:#2E7D32}.hurt .p{color:#E8650F}
+.help b:before{content:"✓ ";color:#2E7D32}
+.book{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:16px;background:#EEF2FD;border:1px solid #D9E2FA;
+      border-radius:12px;padding:12px 18px;break-inside:avoid}
+.book b{display:block;font-size:11.5pt}
+.book span{font-size:9.5pt;color:#5B6470}
+.fine{margin-top:8px;font-size:8pt;line-height:1.35;color:#8A8F9C}
+.pb{break-after:page}
+.pb .label{margin:14px 0 7px}
+.pb .whys{text-align:center;margin:8px 0 6px}
+.pb .whys .why{font-size:9pt;margin:0 0 2px}
+.pb .book{margin-top:12px;padding:10px 18px}
+.panel.mt{padding:14px 16px}
+.panel.mt .gtiles{gap:10px;padding:0}
+.panel.mt .gt{padding:12px 12px 10px}
+.panel.mt .gt .gn{font-size:9.5pt;line-height:1.3}
+.panel.mt .gt b{margin-top:4px;font-size:22pt}
+.hs .sc{color:#fff;border:none;position:relative;overflow:hidden;text-align:left;padding:16px 18px}
+.hs .sc:after{content:"";position:absolute;right:-40px;bottom:-45px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.14)}
+.sc.good{background:#1E7A34}.sc.mid{background:#E8650F}.sc.low{background:#C62828}
+.hs .sc .k{color:rgba(255,255,255,.85)}
+.hs .sc .v{color:#fff}.hs .sc .v small{color:rgba(255,255,255,.75)}
+.hs .sc .chip{background:rgba(255,255,255,.2);color:#fff;position:relative;z-index:1}
+.chip.flat{background:#EEF0F3;color:#5B6470}
+.hrow .p.na{color:#8A8F9C}
+.hrow b.sm{font-size:9.5pt;white-space:nowrap;letter-spacing:-.1px}
+.hempty{font-size:10pt;color:#5B6470;font-style:italic;padding:10px 0}
+.extra{display:grid;gap:16px;align-items:stretch;break-inside:avoid}
+.extra>div{display:flex;flex-direction:column}
+.extra .box.plain{flex:1;margin-bottom:0}
+.gtiles.imp .gt b{font-size:18pt}
+.gt.span2{grid-column:1/-1}
+.plist{padding:10px 0;display:flex;flex-direction:column;gap:8px}
+.pi{background:#fff;border:1px solid #D9E2FA;border-radius:10px;padding:10px 14px;font-weight:600;font-size:10pt;border-left:4px solid #E8650F}
+.panel.notes{padding:14px 18px;font-size:10pt;line-height:1.55;white-space:pre-wrap}
+
+@page{size:letter;margin:0.55in 0.6in 0.75in;
+  @bottom-left{content:"keepitclean@crmrefresh.org";font:9pt Inter,Arial,sans-serif;color:#5B6470}
+  @bottom-right{content:"Keep It Clean";font:9pt Inter,Arial,sans-serif;color:#5B6470}}
+
+/* ---------- app (screen only) ---------- */
+html{background:#F4F6FA}
+.bb-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:#fff;border-bottom:1px solid #E4E7EC}
+.bb-brand{font-weight:800;font-size:15pt;letter-spacing:-.3px}
+.bb-brand span{color:#1C53E5}
+.bb-brand small{display:block;font-size:8.5pt;font-weight:700;letter-spacing:2.5px;color:#1C53E5}
+.bb-wrap{display:grid;grid-template-columns:320px 1fr;gap:24px;padding:24px 28px;align-items:start}
+.bb-side{position:sticky;top:20px;background:#fff;border:1px solid #E4E7EC;border-radius:14px;padding:18px}
+.bb-side h3{font-size:9pt;letter-spacing:1.8px;color:#1C53E5;margin:14px 0 8px}
+.bb-side h3:first-child{margin-top:0}
+.bb-side label{display:block;font-size:9pt;font-weight:600;color:#5B6470;margin:10px 0 4px}
+.bb-side input[type=text],.bb-side input[type=email],.bb-side select{width:100%;padding:9px 11px;border:1px solid #C9D4EC;border-radius:9px;font:10pt Inter,Arial,sans-serif;background:#fff;color:#14181F}
+.bb-side input[type=file]{font:9pt Inter,Arial,sans-serif;width:100%}
+.bb-row{display:flex;gap:8px}
+.bb-row input{flex:1}
+.bb-or{text-align:center;font-size:8.5pt;color:#8A8F9C;margin:10px 0 2px}
+.bb-btn{display:block;width:100%;margin-top:14px;padding:11px;border:0;border-radius:9px;background:#1C53E5;color:#fff;font:700 10.5pt Inter,Arial,sans-serif;cursor:pointer}
+.bb-btn.sec{background:#EEF2FD;color:#1C53E5;border:1px solid #D9E2FA}
+.bb-btn.sm{width:auto;margin-top:0;padding:9px 12px;font-size:9.5pt}
+.bb-btn:disabled{opacity:.45;cursor:default}
+.msg{margin-top:12px;font-size:9pt;color:#2E7D32;line-height:1.4;min-height:1em}
+.msg.bad{color:#C62828}
+.bb-hint{margin-top:14px;padding-top:12px;border-top:1px solid #E4E7EC;font-size:8.5pt;color:#8A8F9C;line-height:1.45}
+.bb-paper{background:#fff;width:8.5in;max-width:100%;min-height:11in;margin:0 auto;padding:0.55in 0.6in 0.75in;box-shadow:0 2px 18px rgba(20,24,31,.08);border-radius:6px}
+.bb-empty{color:#8A8F9C;text-align:center;padding-top:3in;font-size:11pt}
+@media print{
+  html{background:#fff}
+  .bb-bar,.bb-side{display:none!important}
+  .bb-wrap{display:block;padding:0}
+  .bb-paper{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;border-radius:0}
+}
+</style>
+<style id="pagefoot"></style>
+</head>
+<body>
+<div class="bb-bar"><div class="bb-brand"><small>CRM REFRESH</small>Bumble<span>bee</span></div>
+<div style="font-size:9.5pt;color:#5B6470">CRM Health + Keep It Clean monthly report</div></div>
+<div class="bb-wrap">
+  <aside class="bb-side">
+    <h3>1 · LOAD THE TRACKER</h3>
+    <label for="file">Upload the client's Health Score Tracker (CSV or Excel)</label>
+    <input id="file" type="file" accept=".csv,.xlsx,.xls">
+    <div class="bb-or">or</div>
+    <label for="link">Paste its published CSV link (the Web Link row)</label>
+    <div class="bb-row"><input id="link" type="text" placeholder="https://docs.google.com/..."><button id="loadlink" class="bb-btn sec sm">Load</button></div>
+    <h3>2 · CHECK THE DETAILS</h3>
+    <label for="cname">Client name</label>
+    <input id="cname" type="text" placeholder="Filled from the file name">
+    <label for="cemail">Client email (for the survey links)</label>
+    <input id="cemail" type="email" placeholder="Filled from the CLIENT EMAIL row">
+    <label for="month">Month</label>
+    <select id="month"></select>
+    <button id="build" class="bb-btn">Build Report</button>
+    <button id="print" class="bb-btn sec" disabled>Save as PDF</button>
+    <div id="msg" class="msg"></div>
+    <div class="bb-hint">Save as PDF opens your browser's print window. Choose "Save as PDF," Letter size, and turn on background graphics.
+    Blank or 0 in the tracker means that line or section is left out.</div>
+  </aside>
+  <main class="bb-paper"><div id="report"><div class="bb-empty">Load a tracker to build a report.</div></div></main>
+</div>
+<script>
+/* Bumblebee: CRM Health + Keep It Clean monthly report, built from a client's Health Score Tracker. */
+(function () {
+'use strict';
+var BOOKING = 'https://crmrefresh.org/KIC-Session';
+var NPS_URL = 'https://crmrefresh.org/clean-it-feedback';
+var NPS_SOURCE = 'KIC Monthly Report';
+var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var SHORT = MONTHS.map(function (m) { return m.slice(0, 3); });
+var WHY = {
+  organized: 'Every contact is in a group, so that you can send the right message to the right people.',
+  enriched: 'Added missing names, emails, and details, so that you can reach more of your database and make it personal.',
+  deliv: 'So that you can email with confidence and stay out of spam folders.',
+  past: 'Closing dates and addresses are in, so that you can show up on every anniversary and stay top of mind for referrals.',
+  plans: 'Contacts are enrolled into action plans, so that you can stay in touch on schedule without tracking it yourself.',
+  archived: 'Automated and system emails removed, so that you can trust your counts and campaigns only reach real people.',
+  tags: 'Tags are cleaned up as discussed, so that you can find and filter the right contacts fast. Team tags are never touched.',
+  tasks: 'Old and outdated tasks cleared, so that you can focus on what actually needs your attention.',
+  overdue: 'These are follow-ups that haven\u2019t happened yet. Want them cleared or reset? Just say the word, so that you can start fresh.'
+};
+// Sheet label -> name the report uses. "SECTION|Label" wins over "|Label".
+var ALIAS = {
+  'BEFORE - CONTACT INFO|Pending Review': 'Pending Review - Before',
+  'BEFORE - CONTACT INFO|Ungrouped': 'Ungrouped - Before',
+  'BEFORE - CONTACT INFO|Duplicates': 'Duplicates - Before',
+  'AFTER - CONTACT INFO|Pending Review': 'Pending Review - After',
+  'AFTER - CONTACT INFO|Ungrouped': 'Ungrouped - After',
+  'AFTER - CONTACT INFO|Duplicates': 'Duplicates - After',
+  'AFTER - GROUPS|Active Clients': 'Total Active Clients',
+  '|Undeliverable - Newly Tagged': 'Undeliverable Newly Tagged',
+  '|Unsubscribed - Newly Tagged': 'Unsubscribed Newly Tagged',
+  '|# of Total Action Plans Listed': 'Action Plans Set Up',
+  '|# of Total Active Action Plans': 'Action Plans Active'
+};
+var GROUPS = [['Active Clients','Total Active Clients'],['Past Clients','Past Clients'],['Sphere of Influence','Sphere of Influence'],
+              ['Agents','Agents'],['Vendors','Vendors'],['Leads','Leads']];
+
+// ---------- helpers ----------
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function txt(v) { v = String(v == null ? '' : v).trim(); return v === 'nan' ? '' : v; }
+function num(v) {
+  var s = txt(v).replace(/,/g, '').replace(/%$/, '');
+  if (s === '' || s.toUpperCase() === 'N/A') return null;
+  var n = Number(s); return isFinite(n) ? n : null;
+}
+function fmt(n) { return n == null ? '' : Math.round(n).toLocaleString('en-US'); }
+function plural(n, one, many) { return n === 1 ? one : (many || one + 's'); }
+var SMALL = {a:1,an:1,and:1,as:1,at:1,by:1,'for':1,'in':1,of:1,on:1,or:1,the:1,to:1};
+function tc(t) {
+  return String(t).split(' ').map(function (w, i) {
+    if ((i && SMALL[w.toLowerCase()]) || !/^[A-Za-z]/.test(w) || /[A-Z]/.test(w.slice(1))) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+function rawLinks(t) {
+  return esc(t).replace(/https?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g, function (u) { return '<a href="' + u + '">' + u + '</a>'; });
+}
+function linkify(t) {
+  var out = '', pos = 0, re = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, m;
+  while ((m = re.exec(t))) { out += rawLinks(t.slice(pos, m.index)) + '<a href="' + esc(m[2]) + '">' + esc(m[1]) + '</a>'; pos = re.lastIndex; }
+  return out + rawLinks(t.slice(pos));
+}
+function why() {
+  return Array.prototype.slice.call(arguments).filter(Boolean).map(function (t) {
+    var m = /(so that you can )(.+?)([.!?](\s|$)|$)/i.exec(t);
+    var h = m ? esc(t.slice(0, m.index + m[1].length)) + '<b>' + esc(m[2]) + '</b>' + esc(t.slice(m.index + m[1].length + m[2].length)) : esc(t);
+    return '<div class="why">' + h + '</div>';
+  }).join('');
+}
+function isSection(s) { return s && s === s.toUpperCase() && /[A-Z]/.test(s) && !/^WEB LINK:?$/i.test(s); }
+
+// ---------- reading the tracker ----------
+// Returns one record per month: {Month, Year, <field>: value}. Handles the new layout
+// (months across row "Field", fields down column A) and the old one-row-per-month layout.
+function loadFrame(grid, fileName) {
+  var colA = grid.map(function (r) { return txt(r[0]); });
+  var h = colA.indexOf('Field');
+  var top = {}, recs = [], i, j;
+  var nameFromFile = (fileName || '').replace(/\.[^.]+$/, '').split(/\s+-\s+/)[0].trim();
+  if (h === -1) {                       // old layout
+    var head = grid[0].map(txt);
+    for (i = 1; i < grid.length; i++) {
+      var o = {}; head.forEach(function (k, c) { if (k) o[k] = grid[i][c]; });
+      if (o['Client Name'] && !o['Client name']) o['Client name'] = o['Client Name'];
+      if (MONTHS.indexOf(txt(o.Month)) > -1) recs.push(o);
+    }
+    return { recs: recs, top: {}, name: nameFromFile };
+  }
+  for (i = 0; i < h; i++) top[colA[i].toUpperCase().replace(/:$/, '')] = txt(grid[i][1]);
+  for (j = 1; j < grid[h].length; j++) {
+    var m = /^([A-Za-z]+)\s+(\d{4})$/.exec(txt(grid[h][j])); if (!m) continue;
+    var mon = MONTHS[SHORT.indexOf(m[1].slice(0, 3).replace(/^./, function (c) { return c.toUpperCase(); }))] || m[1];
+    var rec = { Month: mon, Year: m[2] }, section = '';
+    for (i = h + 1; i < grid.length; i++) {
+      var f = colA[i]; if (!f) continue;
+      if (isSection(f)) { section = f; continue; }
+      var key = ALIAS[section + '|' + f] || ALIAS['|' + f] || f;
+      if (section.indexOf('BEFORE - GROUPS') === 0) key = 'Group Before: ' + f;
+      rec[key] = grid[i][j];
+    }
+    [['Pending Review','# Pending review (Remaining)','Pending Review Organized'],
+     ['Ungrouped','# of Ungrouped (Remaining)','Ungrouped Organized'],
+     ['Duplicates','# of Duplicates (Remaining)','Duplicates Merged']].forEach(function (x) {
+      var b = num(rec[x[0] + ' - Before']), a = num(rec[x[0] + ' - After']);
+      if (a != null && num(rec[x[1]]) == null) rec[x[1]] = a;
+      if (a != null && b != null && num(rec[x[2]]) == null) rec[x[2]] = b - a;
+    });
+    recs.push(rec);
+  }
+  return { recs: recs, top: top, name: top['CLIENT NAME'] || nameFromFile };
+}
+function monthKey(r) { return Number(r.Year) * 12 + MONTHS.indexOf(txt(r.Month)); }
+function filled(r) { return num(r['Total Contacts']) != null; }
+
+// ---------- Health Score (same math as the original tool) ----------
+function rate(a, b) { return b > 0 ? Math.max(0, Math.min(100, a / b * 100)) : 0; }
+function healthScore(d) {
+  var g = function (k) { return num(d[k]) || 0; };
+  var T = g('Total Contacts');
+  var overdue = num(d['Overdue Tasks']);
+  if (overdue == null) overdue = g('Overdue - Contacts') + g('Overdue - Business Tracker') + g('Overdue - None');
+  var completeness = (rate(T - g('Missing Email'), T) + rate(T - g('Missing Phone'), T) + rate(T - g('Missing Address'), T)) / 3;
+  var dedup = rate(T - g('# of Duplicates (Remaining)'), T);
+  var org = rate(T - g('# of Ungrouped (Remaining)'), T);
+  var sd = g('Undeliverable Tagged (TOTAL)') + g('Unsubscribed Tagged (TOTAL)') + g('Und/Unsub NOT Tagged');
+  var sup = sd > 0 ? rate(g('Undeliverable Tagged (TOTAL)') + g('Unsubscribed Tagged (TOTAL)'), sd) : 100;
+  var ac = g('Total Active Clients');
+  var fresh = ac > 0 ? rate(ac - g('Active Clients No Recent Activity'), ac) : 100;
+  var H = (completeness + dedup + org + sup + fresh) / 5;
+  var plan = g('Action Plans Set Up') > 0 ? rate(g('Action Plans Active'), g('Action Plans Set Up')) : 0;
+  var tasks = g('Total Open Tasks');
+  var ontime = tasks > 0 ? rate(tasks - overdue, tasks) : 100;
+  var pb = g('Total Past Buyers');
+  var pbr = pb > 0 ? rate(pb - g('Past Buyers Missing Email'), pb) : 100;
+  var addr = rate(T - g('Missing Address'), T);
+  var A = (plan + ontime + pbr + addr) / 4;
+  var wh = num(d['Hygiene Weight %']); if (wh == null) wh = 60;
+  var wa = num(d['Activation Weight %']); if (wa == null) wa = 40;
+  var total = Math.round((H * wh + A * wa) / ((wh + wa) || 1));
+  var taskNA = tasks === 0 && overdue === 0;
+  var metrics = [
+    ['Data Completeness', completeness, fmt(g('Missing Email')) + ' Contacts Missing An Email'],
+    ['Deduplication', dedup, fmt(g('# of Duplicates (Remaining)')) + ' Duplicate Records Remain'],
+    ['Organization', org, fmt(g('# of Ungrouped (Remaining)')) + ' Contacts Still Ungrouped'],
+    ['Action-Plan Activation', plan, fmt(Math.max(0, g('Action Plans Set Up') - g('Action Plans Active'))) + ' Plans Set Up But Inactive'],
+    ['Likely To Sell Possibilities', addr, fmt(g('Missing Address')) + ' Contacts Missing A Mailing Address']
+  ];
+  if (!taskNA) metrics.push(['Task Follow-Up', ontime, fmt(overdue) + ' Tasks Overdue']);
+  metrics.push(['Email Deliverability', sup, fmt(g('Und/Unsub NOT Tagged')) + ' Undeliverable/Unsubscribed Contacts Not Tagged'],
+               ['Past Buyers Receiving Your Greeting', pbr, fmt(g('Past Buyers Missing Email')) + ' Past Buyers Missing An Email'],
+               ['Truly Active Clients', fresh, fmt(g('Active Clients No Recent Activity')) + ' Active Clients With No Recent Activity']);
+  var cut = num(d['Helping/ Hurting Cutoff %']) || num(d['Helping/Hurting Cutoff %']) || 85;
+  var helping = metrics.filter(function (m) { return m[1] >= cut; }).sort(function (a, b) { return b[1] - a[1]; });
+  var hurting = metrics.filter(function (m) { return m[1] < cut; });
+  if (taskNA) hurting.push(['Task Follow-Up', ontime, 'No open tasks to measure', 'N/A']);
+  hurting.sort(function (a, b) { return a[1] - b[1]; });
+  var imports = ['Names', 'Phone Numbers', 'Emails', 'Addresses'].map(function (k) { return [k, g(k + ' Imported')]; })
+    .filter(function (x) { return x[1] > 0; });
+  var pend = txt(d['Pending Imports']).replace(/;/g, '\n').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+  return {
+    score: total, band: total >= 80 ? 'good' : (total >= 60 ? 'mid' : 'low'), last: num(d["Last Month's Score"]),
+    hygiene: Math.round(H), activation: Math.round(A), helping: helping, hurting: hurting,
+    maintained: [[g('Duplicates Merged'), 'Duplicates merged'], [g('Pending Review Organized'), 'Pending review organized'],
+                 [g('Ungrouped Organized'), 'Ungrouped organized'],
+                 [g('Past Clients Updated') + g('Contacts with Updated Info'), 'Contacts enriched'],
+                 [g('Undeliverable Newly Tagged') + g('Unsubscribed Newly Tagged'), 'Bounces & Opt\u2011Outs Tagged']],
+    imports: g('Records Imported') > 0 ? [g('Records Imported'), imports] : null,
+    pending: pend, notes: txt(d.Notes)
+  };
+}
+
+// ---------- KIC data ----------
+function shape(row, prev) {
+  var g = function (k) { return num(row[k]); }, t = function (k) { return txt(row[k]); };
+  var r = {};
+  r.asks = [1,2,3,4,5,6,7,8].map(function (i) { return t('Request ' + i); }).filter(Boolean).map(linkify);
+  r.groups = [];
+  GROUPS.forEach(function (x) {
+    var a = g(x[1]); if (a == null) return;
+    var b = g('Group Before: ' + x[0]); if (b == null && prev) b = num(prev[x[1]]);
+    r.groups.push([x[0], b, a, b != null ? a - b : null]);
+  });
+  r.total = g('Total Contacts');
+  r.archived = g('Archived Contacts');
+  r.unsub = g('Unsubscribed Newly Tagged'); r.undeliv = g('Undeliverable Newly Tagged');
+  var nice = {'Addresses Added/Removed':'Addresses added or removed','Groups/Tags Updated':'Groups and tags updated',
+              'Home Anniv Added':'Home anniversaries added','Closed Dates Added':'Closed dates added','Lease Anniv Added':'Lease anniversaries added'};
+  r.past = [];
+  ['Buyers','Sellers','Landlords','Tenants'].forEach(function (typ) {
+    var rows = Object.keys(nice).filter(function (f) { return g(typ + ' - ' + f); }).map(function (f) { return [nice[f], g(typ + ' - ' + f)]; });
+    var note = t(typ + ' - Notes');
+    if (rows.length || note) r.past.push(['Past ' + typ.toLowerCase(), rows, note]);
+  });
+  r.plans = [];
+  Object.keys(row).forEach(function (k) {
+    var m = /^Action Plan:\s*(.+)$/.exec(k);
+    if (m && g(k)) r.plans.push([m[1].trim(), g(k)]);
+  });
+  r.plansNote = t('Action Plan Notes');
+  var parts = ['Contacts','Business Tracker','None'].filter(function (l) { return g('Overdue - ' + l); }).map(function (l) { return [l, g('Overdue - ' + l)]; });
+  var tot = g('Overdue Tasks');
+  if (tot == null && parts.length) tot = parts.reduce(function (s, p) { return s + p[1]; }, 0);
+  if (tot && parts.length && parts.reduce(function (s, p) { return s + p[1]; }, 0) !== tot)
+    throw new Error('The overdue breakdown (' + parts.reduce(function (s, p) { return s + p[1]; }, 0) + ') doesn\u2019t add up to Overdue Tasks (' + tot + '). Fix the tracker first.');
+  r.tasks = { rows: ['Removed','Reset'].filter(function (k) { return g('Tasks ' + k); }).map(function (k) { return ['Tasks ' + k.toLowerCase(), g('Tasks ' + k)]; }),
+              note: t('Task Notes'), total: parts.length ? tot : null, parts: parts };
+  r.tags = { rows: ['Added','Removed'].filter(function (k) { return g('Tags ' + k); }).map(function (k) { return ['Tags ' + k.toLowerCase(), g('Tags ' + k)]; }),
+             note: t('Tag Notes') };
+  return r;
+}
+
+// ---------- HTML pieces ----------
+function bar(name, value, max, unit, cls, extra, compact) {
+  var w = !max ? 0 : Math.max(4, Math.round(100 * (value || 0) / max));
+  return '<div class="bar' + (compact ? ' compact' : '') + '"><div class="n">' + name + '</div><div class="t"><i class="' + (cls || '') +
+         '" style="width:' + w + '%"></i></div><div class="v"><b>' + fmt(value) + '</b>' + esc(unit) + (extra || '') + '</div></div>';
+}
+function box(title, rows, note, opts) {
+  opts = opts || {};
+  var h = '<div class="box' + (opts.green ? ' green' : '') + (opts.plain ? ' plain' : '') + '"><h4>' + esc(tc(title)) + '</h4>' + (opts.topWhy || '');
+  rows.forEach(function (x) { h += '<div class="row"><span>' + esc(tc(x[0])) + '</span>' + (x[1] == null ? '' : '<b>' + fmt(x[1]) + '</b>') + '</div>'; });
+  if (note) h += '<div class="note"><strong>Note:</strong> ' + linkify(note) + '</div>';
+  if (opts.bottomWhy) h += '<div class="bottom-why">' + opts.bottomWhy + '</div>';
+  return h + '</div>';
+}
+function label(t, cls) { return '<div class="label' + (cls ? ' ' + cls : '') + '">' + t + '</div>'; }
+function keep(h) { return '<div class="keep">' + h + '</div>'; }
+
+function render(name, monthLong, email, hs, k) {
+  var btn = '<a class="btn" href="' + BOOKING + '">Book My Session \u2192</a>';
+  var o = [];
+  // ---- page 1: Health Score
+  var chip;
+  if (!hs.last) chip = '<span class="chip flat">New \u00b7 your first report</span>';
+  else { var dl = hs.score - Math.round(hs.last);
+    chip = '<span class="chip">' + (dl > 0 ? '\u2191' : dl < 0 ? '\u2193' : '\u2192') + ' ' + Math.abs(dl) + ' pts since last month</span>'; }
+  var bars = bar('Hygiene<span>data is clean</span>', hs.hygiene, 100, '') + bar('Activation<span>data is engaged</span>', hs.activation, 100, '');
+  var tiles = hs.maintained.map(function (x) { return '<div class="gt c"><span class="gn">' + esc(tc(x[1])) + '</span><b>' + fmt(x[0]) + '</b></div>'; }).join('');
+  var hrow = function (m) { return '<div class="hrow"><div><b' + (m[0].length > 28 ? ' class="sm"' : '') + '>' + esc(m[0]) + '</b></div><div class="p">' + Math.round(m[1]) + '%</div></div>'; };
+  var trow = function (m) { return '<div class="hrow"><div><b' + (m[0].length > 28 ? ' class="sm"' : '') + '>' + esc(m[0]) + '</b><span>' + esc(m[2]) +
+    '</span></div><div class="p' + (m[3] ? ' na' : '') + '">' + (m[3] || Math.round(m[1]) + '%') + '</div></div>'; };
+  o.push('<div class="pb"><div class="head"><div><div class="eyebrow">CRM REFRESH</div><div class="title">CRM Health <span>Report</span></div></div>' +
+    '<div class="prep">Prepared for<b>' + esc(name) + '</b>' + esc(monthLong) + ' \u00b7 Keep It Clean</div></div>' +
+    '<div class="panel" style="padding:10px;margin-top:14px"><div class="hs"><div class="sc ' + hs.band + '"><div class="k">CRM HEALTH SCORE</div>' +
+    '<div class="v">' + hs.score + '<small>/100</small></div>' + chip + '</div><div class="bars">' + bars + '</div></div></div>' +
+    label('WHAT WE MAINTAINED THIS MONTH') + '<div class="panel mt"><div class="gtiles" style="grid-template-columns:repeat(5,minmax(0,1fr))">' + tiles + '</div></div>' +
+    '<div class="hh"><div>' + label('WHAT\u2019S HELPING YOUR SCORE', 'green') + '<div class="hbox help">' +
+    (hs.helping.map(hrow).join('') || '<div class="hempty">Building the foundation. See priorities at right.</div>') + '</div></div><div>' +
+    label('WHAT\u2019S HURTING YOUR SCORE', 'orange') + '<div class="hbox hurt">' +
+    (hs.hurting.map(trow).join('') || '<div class="hempty">Nothing major dragging your score. Your CRM is in excellent shape.</div>') + '</div></div></div>' +
+    '<div class="book"><div><b>Questions? Or ready to fix what\u2019s hurting your score?</b><span>Book a session and we\u2019ll walk through your priorities together. It\u2019s already included in your plan.</span></div>' + btn + '</div></div>');
+
+  // ---- what we need from you
+  if (k.asks.length) o.push(keep(label('WHAT WE NEED FROM YOU', 'orange') + '<div class="needs">' +
+    k.asks.map(function (a, i) { return '<div class="ask"><span class="num">' + (i + 1) + '</span><div>' + a + '</div></div>'; }).join('') +
+    '<div class="needs-foot"><span>Questions about any of this? A session is already included in your plan.</span>' + btn + '</div></div>'));
+
+  // ---- imports
+  var pair = [];
+  if (hs.imports) pair.push('<div>' + label('FILE IMPORTS THIS MONTH') + box(fmt(hs.imports[0]) + ' Records Imported',
+    hs.imports[1].map(function (x) { return [x[0] + ' Imported', x[1]]; }), '', { plain: true, bottomWhy: why(WHY.enriched) }) + '</div>');
+  if (hs.pending.length) pair.push('<div>' + label('PENDING IMPORTS') + box(hs.pending.length + ' ' + plural(hs.pending.length, 'File') + ' Waiting to Import',
+    hs.pending.map(function (p) { return [p, null]; }), '', { plain: true }) + '</div>');
+  var extra = pair.length ? '<div class="extra" style="grid-template-columns:repeat(' + pair.length + ',1fr)">' + pair.join('') + '</div>' : '';
+  if (hs.notes) extra += label('NOTES FROM THE CRM REFRESH TEAM') + '<div class="panel notes">' + esc(hs.notes) + '</div>';
+  if (extra) o.push(keep(extra));
+
+  // ---- email deliverability
+  if (k.unsub || k.undeliv) {
+    var t = '';
+    if (k.unsub) t += '<div class="gt et"><span class="gn">New ' + plural(k.unsub, 'Unsubscribe') + '</span><b>' + fmt(k.unsub) +
+      '</b><em>Contacts who opted out of your marketing since last month, now tagged CRM: Unsubscribed so they\u2019re never emailed by mistake.</em></div>';
+    if (k.undeliv) t += '<div class="gt et"><span class="gn">New ' + plural(k.undeliv, 'Undeliverable') + '</span><b>' + fmt(k.undeliv) +
+      '</b><em>Bad or bouncing addresses caught this month and tagged CRM: Undeliverable before they hurt your sender reputation.</em></div>';
+    o.push(keep(label('EMAIL DELIVERABILITY') + '<div class="panel deliv"><div class="dl"><h4>You know exactly who can be emailed, and who can\u2019t.</h4>' +
+      '<p>Every month we catch the contacts who\u2019ve newly unsubscribed from your marketing and the new dead or invalid addresses in your CRM, and tag them. ' +
+      'That helps you honor opt-outs, keeps your emails out of spam folders, and keeps your list counts honest.</p>' + why(WHY.deliv) + '</div>' +
+      '<div class="dr" style="grid-template-columns:repeat(' + ((k.unsub ? 1 : 0) + (k.undeliv ? 1 : 0)) + ',1fr)">' + t + '</div></div>'));
+  }
+
+  // ---- groups
+  if (k.groups.length) {
+    var gt = k.groups.map(function (x) {
+      var c = x[3];
+      var ch = c ? '<span class="chip ' + (c > 0 ? 'up' : 'dn') + '">' + (c > 0 ? '+' : '\u2212') + fmt(Math.abs(c)) + '</span>' : '<span class="chip eq">No change</span>';
+      return '<div class="gt c"><span class="gn">' + esc(x[0]) + '</span><b>' + fmt(x[2]) + '</b><span class="gc">' + ch + '<em>' + (x[1] != null && c ? 'from ' + fmt(x[1]) : '') + '</em></span></div>';
+    }).join('');
+    o.push(keep(label('YOUR GROUPS') + why(WHY.organized) + '<div class="panel"><div class="gtiles">' + gt + '</div>' +
+      (k.total ? '<div class="foot">' + fmt(k.total) + ' total contacts in your CRM. Contacts can sit in more than one group.</div>' : '') + '</div>'));
+  }
+
+  // ---- past clients
+  if (!k.past.length) o.push(keep(label('PAST CLIENT UPDATES', 'green') +
+    '<div class="box green caught"><b>\u2713 You\u2019re all caught up!</b><span>No new closed transactions to update this month.</span></div>'));
+  else o.push(keep(label('PAST CLIENT UPDATES', 'green') + why(WHY.past) + '<div class="cols eq">' +
+    k.past.map(function (p) { return box(p[0], p[1], p[2], { green: true }); }).join('') + '</div>'));
+
+  // ---- action plans | admin
+  var right = [];
+  if (k.plans.length || k.plansNote) {
+    var mx = Math.max.apply(null, k.plans.map(function (p) { return p[1]; }).concat([1]));
+    right.push(keep(label('ACTION PLAN ENROLLMENTS') + why(WHY.plans) + '<div class="panel">' +
+      k.plans.map(function (p) { return bar(esc(p[0]), p[1], mx, ' enrolled', '', '', true); }).join('') +
+      (k.plansNote ? '<div class="foot"><strong>Note:</strong> ' + linkify(k.plansNote) + '</div>' : '') + '</div>'));
+  }
+  var misc = [];
+  if (k.archived) misc.push(box('Archived Contacts', [['Contacts archived', k.archived]], '', { bottomWhy: why(WHY.archived) }));
+  if ((k.tasks.rows.length || k.tasks.note) && !k.tasks.total) misc.push(box('Tasks Updated', k.tasks.rows, k.tasks.note, { topWhy: why(WHY.tasks) }));
+  if (k.tags.rows.length || k.tags.note) misc.push(box('Tags Updated', k.tags.rows, k.tags.note, { topWhy: why(WHY.tags) }));
+  if (misc.length) right.push(label('ADMIN UPDATES') + misc.join(''));
+  if (right.length === 2) o.push('<div class="cols" style="grid-template-columns:1.55fr 1fr"><div>' + right[0] + '</div><div>' + right[1] + '</div></div>');
+  else if (right.length) o.push(right[0]);
+
+  // ---- overdue tasks | task updates
+  var tk = k.tasks;
+  if (tk.total) {
+    var m2 = Math.max.apply(null, tk.parts.map(function (p) { return p[1]; }));
+    var od = keep(label('OVERDUE TASKS IN YOUR CRM', 'orange') + why(WHY.overdue) + '<div class="panel wide">' +
+      tk.parts.map(function (p) { return bar(esc(p[0]), p[1], m2, p[1] === 1 ? ' task' : ' tasks', 'o'); }).join('') +
+      '<div class="tot"><span>Total Overdue</span><span>' + fmt(tk.total) + '</span></div></div>');
+    if (tk.rows.length || tk.note) o.push('<div class="cols" style="grid-template-columns:1.55fr 1fr"><div>' + od + '</div><div>' +
+      label('TASK UPDATES') + why(WHY.tasks) + box('Tasks Updated', tk.rows, tk.note) + '</div></div>');
+    else o.push(od);
+  }
+
+  // ---- booking + NPS
+  o.push('<div class="book"><div><b>Questions about your report?</b><span>Book a session and we\u2019ll walk through it together. It\u2019s already included in your plan.</span></div>' + btn + '</div>');
+  var first = (name || '').split(' ')[0];
+  var nb = '';
+  for (var n = 0; n <= 10; n++) {
+    var q = 'score=' + n + '&name=' + encodeURIComponent(first) + (email ? '&email=' + encodeURIComponent(email) : '') + '&source=' + encodeURIComponent(NPS_SOURCE);
+    nb += '<a class="nb" href="' + NPS_URL + '?' + q + '">' + n + '</a>';
+  }
+  o.push('<div class="keep npswrap">' + label('LET US KNOW HOW WE\u2019RE DOING') + '<div class="nps"><b>How likely are you to recommend CRM Refresh to a friend or colleague?</b>' +
+    '<div class="nbs">' + nb + '</div><span>0 = Not likely &nbsp;\u00b7&nbsp; 10 = Extremely likely</span></div></div>');
+  return o.join('\n');
+}
+
+// ---------- app ----------
+var state = { frame: null, fileName: '' };
+var $ = function (id) { return document.getElementById(id); };
+function setMsg(t, bad) { var m = $('msg'); m.textContent = t || ''; m.className = 'msg' + (bad ? ' bad' : ''); }
+function useGrid(grid, fileName) {
+  state.frame = loadFrame(grid, fileName); state.fileName = fileName || '';
+  var recs = state.frame.recs.slice().sort(function (a, b) { return monthKey(a) - monthKey(b); });
+  var sel = $('month'); sel.innerHTML = '';
+  var lastFilled = '';
+  recs.forEach(function (r) {
+    var v = txt(r.Month) + ' ' + Number(r.Year);
+    var opt = document.createElement('option'); opt.value = v;
+    opt.textContent = v + (filled(r) ? '' : '  (no data yet)'); sel.appendChild(opt);
+    if (filled(r)) lastFilled = v;
+  });
+  if (lastFilled) sel.value = lastFilled;
+  if (!$('cname').value) $('cname').value = state.frame.name || '';
+  if (!$('cemail').value) $('cemail').value = state.frame.top['CLIENT EMAIL'] || '';
+  setMsg(recs.length ? 'Loaded ' + recs.length + ' months. Pick one and build the report.' : 'No months found in that file.', !recs.length);
+}
+function parseCSV(text) { return Papa.parse(text, { skipEmptyLines: false }).data; }
+function loadFile(file) {
+  var r = new FileReader();
+  if (/\.xlsx?$/i.test(file.name)) {
+    r.onload = function () {
+      var wb = XLSX.read(r.result, { type: 'array' });
+      var sh = wb.Sheets['Client Health Score Data'] || wb.Sheets[wb.SheetNames[0]];
+      useGrid(XLSX.utils.sheet_to_json(sh, { header: 1, raw: false, defval: '' }), file.name);
+    };
+    r.readAsArrayBuffer(file);
+  } else { r.onload = function () { useGrid(parseCSV(r.result), file.name); }; r.readAsText(file); }
+}
+function loadLink() {
+  var url = $('link').value.trim(); if (!url) return;
+  url = url.replace(/\/edit.*$/, '/export?format=csv').replace(/\/pubhtml.*$/, '/pub?output=csv');
+  setMsg('Loading\u2026');
+  fetch(url).then(function (res) { if (!res.ok) throw new Error(res.status); return res.text(); })
+    .then(function (t) { useGrid(parseCSV(t), ''); })
+    .catch(function () { setMsg('Couldn\u2019t load that link. Use the sheet\u2019s Publish-to-web CSV link (the Web Link row), or upload the file.', true); });
+}
+function build() {
+  try {
+    if (!state.frame) throw new Error('Load a tracker first.');
+    var name = $('cname').value.trim();
+    if (!name) throw new Error('Add the client name.');
+    var mv = $('month').value.split(' '), mon = mv[0], yr = mv[1];
+    var recs = state.frame.recs.slice().sort(function (a, b) { return monthKey(a) - monthKey(b); });
+    var row = recs.filter(function (r) { return txt(r.Month) === mon && String(Number(r.Year)) === yr; })[0];
+    if (!row || !filled(row)) throw new Error(mon + ' ' + yr + ' doesn\u2019t have data yet.');
+    var prev = recs.filter(function (r) { return monthKey(r) < monthKey(row) && filled(r); }).pop() || null;
+    var hs = healthScore(row);
+    if (!hs.last && prev) hs.last = healthScore(prev).score;     // worked out from last month, nothing to type
+    var k = shape(row, prev);
+    $('report').innerHTML = render(name, mon + ' ' + yr, $('cemail').value.trim(), hs, k);
+    $('pagefoot').textContent = '@page{@bottom-left{content:"keepitclean@crmrefresh.org"}@bottom-right{content:"Keep It Clean \u00b7 ' + mon + ' ' + yr + '"}}';
+    document.title = name + ' - Monthly Report (' + mon + ' ' + yr + ')';
+    $('print').disabled = false;
+    setMsg('Report ready. Use Save as PDF to download it.');
+  } catch (err) { setMsg(err.message, true); }
+}
+document.addEventListener('DOMContentLoaded', function () {
+  $('file').addEventListener('change', function (e) { if (e.target.files[0]) loadFile(e.target.files[0]); });
+  $('loadlink').addEventListener('click', loadLink);
+  $('build').addEventListener('click', build);
+  $('print').addEventListener('click', function () { window.print(); });
+});
+})();
+
+</script>
+</body>
+</html>

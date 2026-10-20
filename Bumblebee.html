@@ -111,6 +111,11 @@ a.btn{flex:none;background:#1C53E5;color:#fff;text-decoration:none;font-weight:7
 .caught{display:flex;align-items:center;gap:12px;padding:14px 18px}
 .caught b{font-size:12pt;color:#2E7D32}
 .caught span{font-size:10pt;color:#5B6470}
+.caught.slim{margin-top:12px;padding:10px 16px}
+.panel .bar.compact.plan{grid-template-columns:1.45in 1fr auto}
+.bar.plan .v{display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.bar.plan .v .chip{margin-left:8px}
+.caught.slim b{font-size:10.5pt}
 .why{font-family:'DM Sans',Inter,sans-serif;font-style:normal;font-weight:400;font-size:10.5pt;letter-spacing:0;font-variation-settings:'opsz' 14;color:#3A404C;line-height:1.3;margin:-4px 0 9px;text-wrap:pretty}
 .whys{margin-top:8px}.whys .why{margin:0 0 3px}
 .box .why{margin:0 0 6px;font-size:10pt;color:#1C53E5}
@@ -171,9 +176,10 @@ a.btn{flex:none;background:#1C53E5;color:#fff;text-decoration:none;font-weight:7
 .pi{background:#fff;border:1px solid #D9E2FA;border-radius:10px;padding:10px 14px;font-weight:600;font-size:10pt;border-left:4px solid #E8650F}
 .panel.notes{padding:14px 18px;font-size:10pt;line-height:1.55;white-space:pre-wrap}
 
-@page{size:letter;margin:0.55in 0.6in 0.75in;
-  @bottom-left{content:"keepitclean@crmrefresh.org";font:9pt Inter,Arial,sans-serif;color:#5B6470}
-  @bottom-right{content:"Keep It Clean";font:9pt Inter,Arial,sans-serif;color:#5B6470}}
+/* No page margins, so the browser has nowhere to print its own date/title header.
+   The page padding is repeated on every printed page instead, and the footer is fixed to each page. */
+@page{size:letter;margin:0}
+.bb-foot{display:none}
 
 /* ---------- app (screen only) ---------- */
 html{background:#F4F6FA}
@@ -204,10 +210,13 @@ html{background:#F4F6FA}
   html{background:#fff}
   .bb-bar,.bb-side{display:none!important}
   .bb-wrap{display:block;padding:0}
-  .bb-paper{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;border-radius:0}
+  .bb-paper{width:auto;min-height:0;margin:0;padding:0.55in 0.6in 0.85in;box-shadow:none;border-radius:0;
+            -webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .bb-foot{display:flex;justify-content:space-between;position:fixed;left:0.6in;right:0.6in;bottom:0.35in;
+           padding-top:6px;border-top:1px solid #DDE3D6;font:9pt Inter,Arial,sans-serif;color:#5B6470}
 }
 </style>
-<style id="pagefoot"></style>
+
 </head>
 <body>
 <div class="bb-bar"><div class="bb-brand"><small>CRM REFRESH</small>Bumble<span>bee</span></div>
@@ -230,7 +239,7 @@ html{background:#F4F6FA}
     <div class="bb-hint">Save as PDF opens your browser's print window. Choose "Save as PDF," Letter size, and turn on background graphics.
     Blank or 0 in the tracker means that line or section is left out.</div>
   </aside>
-  <main class="bb-paper"><div id="report"><div class="bb-empty">Load a tracker to build a report.</div></div></main>
+  <main class="bb-paper"><div class="bb-foot"><span>keepitclean@crmrefresh.org</span><span id="footmonth">Keep It Clean</span></div><div id="report"><div class="bb-empty">Load a tracker to build a report.</div></div></main>
 </div>
 <script>
 /* Bumblebee: CRM Health + Keep It Clean monthly report, built from a client's Health Score Tracker. */
@@ -266,6 +275,8 @@ var ALIAS = {
   '|# of Total Action Plans Listed': 'Action Plans Set Up',
   '|# of Total Active Action Plans': 'Action Plans Active'
 };
+// "N/A", "No new closed transactions", "None within the last year" ... count as nothing to report
+var FILLER = /^(n\/?a|none\b.*|-|no new .*|nothing .*)$/i;
 var GROUPS = [['Active Clients','Total Active Clients'],['Past Clients','Past Clients'],['Sphere of Influence','Sphere of Influence'],
               ['Agents','Agents'],['Vendors','Vendors'],['Leads','Leads']];
 
@@ -419,18 +430,22 @@ function shape(row, prev) {
   r.unsub = g('Unsubscribed Newly Tagged'); r.undeliv = g('Undeliverable Newly Tagged');
   var nice = {'Addresses Added/Removed':'Addresses added or removed','Groups/Tags Updated':'Groups and tags updated',
               'Home Anniv Added':'Home anniversaries added','Closed Dates Added':'Closed dates added','Lease Anniv Added':'Lease anniversaries added'};
-  r.past = [];
+  r.past = []; r.pastQuiet = [];
   ['Buyers','Sellers','Landlords','Tenants'].forEach(function (typ) {
     var rows = Object.keys(nice).filter(function (f) { return g(typ + ' - ' + f); }).map(function (f) { return [nice[f], g(typ + ' - ' + f)]; });
-    var note = t(typ + ' - Notes');
+    var note = t(typ + ' - Notes'); if (FILLER.test(note)) note = '';
     if (rows.length || note) r.past.push(['Past ' + typ.toLowerCase(), rows, note]);
+    else r.pastQuiet.push(typ.toLowerCase());
   });
-  r.plans = [];
+  // each plan: [name, added this month, total in the plan now]
+  var plans = {}, order = [];
   Object.keys(row).forEach(function (k) {
-    var m = /^Action Plan:\s*(.+)$/.exec(k);
-    if (m && g(k)) r.plans.push([m[1].trim(), g(k)]);
+    var m = /^Action Plan( Total)?:\s*(.+)$/.exec(k); if (!m) return;
+    var n = m[2].trim(); if (!plans[n]) { plans[n] = [n, null, null]; order.push(n); }
+    plans[n][m[1] ? 2 : 1] = g(k);
   });
-  r.plansNote = t('Action Plan Notes');
+  r.plans = order.map(function (n) { return plans[n]; }).filter(function (p) { return p[1] || p[2]; });
+  r.plansNote = t('Action Plan Notes'); if (FILLER.test(r.plansNote)) r.plansNote = '';
   var parts = ['Contacts','Business Tracker','None'].filter(function (l) { return g('Overdue - ' + l); }).map(function (l) { return [l, g('Overdue - ' + l)]; });
   var tot = g('Overdue Tasks');
   if (tot == null && parts.length) tot = parts.reduce(function (s, p) { return s + p[1]; }, 0);
@@ -526,15 +541,30 @@ function render(name, monthLong, email, hs, k) {
   // ---- past clients
   if (!k.past.length) o.push(keep(label('PAST CLIENT UPDATES', 'green') +
     '<div class="box green caught"><b>\u2713 You\u2019re all caught up!</b><span>No new closed transactions to update this month.</span></div>'));
-  else o.push(keep(label('PAST CLIENT UPDATES', 'green') + why(WHY.past) + '<div class="cols eq">' +
-    k.past.map(function (p) { return box(p[0], p[1], p[2], { green: true }); }).join('') + '</div>'));
+  else {
+    var quiet = '';
+    if (k.pastQuiet.length) {
+      var q = k.pastQuiet;
+      var list = q.length === 1 ? q[0] : q.slice(0, -1).join(', ') + (q.length > 2 ? ',' : '') + ' and ' + q[q.length - 1];
+      quiet = '<div class="box green caught slim"><b>\u2713 All caught up</b><span>No new closed transactions for ' + list + ' this month.</span></div>';
+    }
+    o.push(keep(label('PAST CLIENT UPDATES', 'green') + why(WHY.past) + '<div class="cols eq">' +
+      k.past.map(function (p) { return box(p[0], p[1], p[2], { green: true }); }).join('') + '</div>' + quiet));
+  }
 
   // ---- action plans | admin
   var right = [];
   if (k.plans.length || k.plansNote) {
-    var mx = Math.max.apply(null, k.plans.map(function (p) { return p[1]; }).concat([1]));
+    var hasTotals = k.plans.some(function (p) { return p[2]; });
+    var mx = Math.max.apply(null, k.plans.map(function (p) { return p[2] || p[1] || 0; }).concat([1]));
+    var planRow = function (p) {
+      var shown = p[2] || p[1] || 0, w = Math.max(4, Math.round(100 * shown / mx));
+      var add = p[1] ? '<span class="chip up">+' + fmt(p[1]) + ' this month</span>' : '';
+      var val = p[2] ? '<b>' + fmt(p[2]) + '</b> total' + add : '<b>+' + fmt(p[1]) + '</b> this month';
+      return '<div class="bar compact plan"><div class="n">' + esc(p[0]) + '</div><div class="t"><i style="width:' + w + '%"></i></div><div class="v">' + val + '</div></div>';
+    };
     right.push(keep(label('ACTION PLAN ENROLLMENTS') + why(WHY.plans) + '<div class="panel">' +
-      k.plans.map(function (p) { return bar(esc(p[0]), p[1], mx, ' enrolled', '', '', true); }).join('') +
+      k.plans.map(planRow).join('') +
       (k.plansNote ? '<div class="foot"><strong>Note:</strong> ' + linkify(k.plansNote) + '</div>' : '') + '</div>'));
   }
   var misc = [];
@@ -613,7 +643,7 @@ function build() {
     if (!hs.last && prev) hs.last = healthScore(prev).score;     // worked out from last month, nothing to type
     var k = shape(row, prev);
     $('report').innerHTML = render(name, mon + ' ' + yr, $('cemail').value.trim(), hs, k);
-    $('pagefoot').textContent = '@page{@bottom-left{content:"keepitclean@crmrefresh.org"}@bottom-right{content:"Keep It Clean \u00b7 ' + mon + ' ' + yr + '"}}';
+    $('footmonth').textContent = 'Keep It Clean \u00b7 ' + mon + ' ' + yr;
     document.title = name + ' - Monthly Report (' + mon + ' ' + yr + ')';
     $('print').disabled = false;
     setMsg('Report ready. Use Save as PDF to download it.');

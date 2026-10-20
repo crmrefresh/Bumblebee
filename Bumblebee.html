@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* ---------- report (also what prints) ---------- */
 
@@ -216,14 +215,11 @@ html{background:#F4F6FA}
 <div class="bb-wrap">
   <aside class="bb-side">
     <h3>1 · LOAD THE TRACKER</h3>
-    <label for="file">Upload the client's Health Score Tracker (CSV or Excel)</label>
-    <input id="file" type="file" accept=".csv,.xlsx,.xls">
-    <div class="bb-or">or</div>
-    <label for="link">Paste its published CSV link (the Web Link row)</label>
+    <label for="link">Paste the client's tracker link (the Web Link row)</label>
     <div class="bb-row"><input id="link" type="text" placeholder="https://docs.google.com/..."><button id="loadlink" class="bb-btn sec sm">Load</button></div>
     <h3>2 · CHECK THE DETAILS</h3>
     <label for="cname">Client name</label>
-    <input id="cname" type="text" placeholder="Filled from the file name">
+    <input id="cname" type="text" placeholder="Filled from the CLIENT NAME row">
     <label for="cemail">Client email (for the survey links)</label>
     <input id="cemail" type="email" placeholder="Filled from the CLIENT EMAIL row">
     <label for="month">Month</label>
@@ -590,35 +586,24 @@ function useGrid(grid, fileName) {
     if (filled(r)) lastFilled = v;
   });
   if (lastFilled) sel.value = lastFilled;
-  if (!$('cname').value) $('cname').value = state.frame.name || '';
-  if (!$('cemail').value) $('cemail').value = state.frame.top['CLIENT EMAIL'] || '';
+  $('cname').value = state.frame.name || '';
+  $('cemail').value = state.frame.top['CLIENT EMAIL'] || '';
   setMsg(recs.length ? 'Loaded ' + recs.length + ' months. Pick one and build the report.' : 'No months found in that file.', !recs.length);
 }
 function parseCSV(text) { return Papa.parse(text, { skipEmptyLines: false }).data; }
-function loadFile(file) {
-  var r = new FileReader();
-  if (/\.xlsx?$/i.test(file.name)) {
-    r.onload = function () {
-      var wb = XLSX.read(r.result, { type: 'array' });
-      var sh = wb.Sheets['Client Health Score Data'] || wb.Sheets[wb.SheetNames[0]];
-      useGrid(XLSX.utils.sheet_to_json(sh, { header: 1, raw: false, defval: '' }), file.name);
-    };
-    r.readAsArrayBuffer(file);
-  } else { r.onload = function () { useGrid(parseCSV(r.result), file.name); }; r.readAsText(file); }
-}
 function loadLink() {
   var url = $('link').value.trim(); if (!url) return;
   url = url.replace(/\/edit.*$/, '/export?format=csv').replace(/\/pubhtml.*$/, '/pub?output=csv');
   setMsg('Loading\u2026');
   fetch(url).then(function (res) { if (!res.ok) throw new Error(res.status); return res.text(); })
     .then(function (t) { useGrid(parseCSV(t), ''); })
-    .catch(function () { setMsg('Couldn\u2019t load that link. Use the sheet\u2019s Publish-to-web CSV link (the Web Link row), or upload the file.', true); });
+    .catch(function () { setMsg('Couldn\u2019t load that link. Use the published CSV link from the tracker\u2019s Web Link row.', true); });
 }
 function build() {
   try {
     if (!state.frame) throw new Error('Load a tracker first.');
     var name = $('cname').value.trim();
-    if (!name) throw new Error('Add the client name.');
+    if (!name) throw new Error('Add the client name, or fill in the CLIENT NAME row in the tracker.');
     var mv = $('month').value.split(' '), mon = mv[0], yr = mv[1];
     var recs = state.frame.recs.slice().sort(function (a, b) { return monthKey(a) - monthKey(b); });
     var row = recs.filter(function (r) { return txt(r.Month) === mon && String(Number(r.Year)) === yr; })[0];
@@ -635,8 +620,8 @@ function build() {
   } catch (err) { setMsg(err.message, true); }
 }
 document.addEventListener('DOMContentLoaded', function () {
-  $('file').addEventListener('change', function (e) { if (e.target.files[0]) loadFile(e.target.files[0]); });
   $('loadlink').addEventListener('click', loadLink);
+  $('link').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadLink(); });
   $('build').addEventListener('click', build);
   $('print').addEventListener('click', function () { window.print(); });
 });
